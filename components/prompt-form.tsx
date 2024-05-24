@@ -1,22 +1,14 @@
-'use client'
-
-import * as React from 'react'
-import Textarea from 'react-textarea-autosize'
-
-import { useActions, useUIState } from 'ai/rsc'
-
-import { UserMessage } from './stocks/message'
-import { type AI } from '@/lib/chat/actions'
-import { Button } from '@/components/ui/button'
-import { IconArrowElbow, IconPlus } from '@/components/ui/icons'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger
-} from '@/components/ui/tooltip'
-import { useEnterSubmit } from '@/lib/hooks/use-enter-submit'
-import { nanoid } from 'nanoid'
-import { useRouter } from 'next/navigation'
+import * as React from 'react';
+import Textarea from 'react-textarea-autosize';
+import { useActions, useUIState } from 'ai/rsc';
+import { UserMessage } from './stocks/message';
+import { AI } from '@/lib/chat/actions';
+import { Button } from '@/components/ui/button';
+import { IconArrowElbow, IconPlus } from '@/components/ui/icons';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
+import { nanoid } from 'nanoid';
+import axios from 'axios';
 
 export function PromptForm({
   input,
@@ -25,32 +17,62 @@ export function PromptForm({
   input: string
   setInput: (value: string) => void
 }) {
-  const router = useRouter()
-  const { formRef, onKeyDown } = useEnterSubmit()
-  const inputRef = React.useRef<HTMLTextAreaElement>(null)
-  const { submitUserMessage } = useActions()
-  const [_, setMessages] = useUIState<typeof AI>()
+  const { formRef, onKeyDown } = useEnterSubmit();
+  const inputRef = React.useRef<HTMLTextAreaElement>(null); 
+  const { submitUserMessage, summarizeFileContent } = useActions();
+  const [_, setMessages] = useUIState<typeof AI>();
+  const [file, setFile] = React.useState<File | null>(null);
 
   React.useEffect(() => {
     if (inputRef.current) {
-      inputRef.current.focus()
+      inputRef.current.focus();
     }
-  }, [])
+  }, []);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files ? event.target.files[0] : null;
+    setFile(file);
+    console.log(file);
+    // handleUploadClick(); // Remove this line
+  }
+
+  const handleUploadClick = async () => {
+    if (file) {
+      // Display the file name as a user message
+      setMessages(currentMessages => [
+        ...currentMessages,
+        {
+          id: nanoid(),
+          display: <UserMessage>{file.name}</UserMessage>
+        }
+      ]);
+      try {
+        // Call the summarizeFileContent function
+        const summarizationResult = await summarizeFileContent(file);
+        // Display the summarization result as a user message
+        setMessages(currentMessages => [...currentMessages, summarizationResult]);
+        console.log('Summarized file content:', summarizationResult);
+      } catch (error) {
+        console.error('Error summarizing file:', error);
+        // Handle error as needed
+      }
+    }
+  }
 
   return (
     <form
       ref={formRef}
       onSubmit={async (e: any) => {
-        e.preventDefault()
+        e.preventDefault();
 
         // Blur focus on mobile
         if (window.innerWidth < 600) {
-          e.target['message']?.blur()
+          e.target['message']?.blur();
         }
 
-        const value = input.trim()
-        setInput('')
-        if (!value) return
+        const value = input.trim();
+        setInput('');
+        if (!value) return;
 
         // Optimistically add user message UI
         setMessages(currentMessages => [
@@ -59,11 +81,11 @@ export function PromptForm({
             id: nanoid(),
             display: <UserMessage>{value}</UserMessage>
           }
-        ])
+        ]);
 
         // Submit and get response message
-        const responseMessage = await submitUserMessage(value)
-        setMessages(currentMessages => [...currentMessages, responseMessage])
+        const responseMessage = await submitUserMessage(value);
+        setMessages(currentMessages => [...currentMessages, responseMessage]);
       }}
     >
       <div className="relative flex max-h-60 w-full grow flex-col overflow-hidden bg-background px-8 sm:rounded-md sm:border sm:px-12">
@@ -74,15 +96,21 @@ export function PromptForm({
               size="icon"
               className="absolute left-0 top-[14px] size-8 rounded-full bg-background p-0 sm:left-4"
               onClick={() => {
-                router.push('/new')
+                document.getElementById('file-upload')?.click();
               }}
             >
               <IconPlus />
-              <span className="sr-only">New Chat</span>
+              <span className="sr-only">Upload File</span>
             </Button>
           </TooltipTrigger>
-          <TooltipContent>New Chat</TooltipContent>
+          <TooltipContent>Upload File</TooltipContent>
         </Tooltip>
+        <input
+          type="file"
+          id="file-upload"
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
         <Textarea
           ref={inputRef}
           tabIndex={0}
@@ -101,7 +129,7 @@ export function PromptForm({
         <div className="absolute right-0 top-[13px] sm:right-4">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button type="submit" size="icon" disabled={input === ''}>
+              <Button type="submit" size="icon" disabled={input === ''} onClick={handleUploadClick}>
                 <IconArrowElbow />
                 <span className="sr-only">Send message</span>
               </Button>
@@ -111,5 +139,5 @@ export function PromptForm({
         </div>
       </div>
     </form>
-  )
+  );
 }
